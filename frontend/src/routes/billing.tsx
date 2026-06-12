@@ -7,11 +7,12 @@ import { StatusBadge } from "@/components/status-badge";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { api } from "@convex/api";
 import { calculateBill, fmtUSD, fmtDate } from "@/utils/billingCalculator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { CONSUMERS, BILLS, type Bill } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/billing")({
   component: () => <ProtectedRoute><BillingPage /></ProtectedRoute>,
@@ -21,15 +22,26 @@ const PAGE_SIZE = 20;
 
 function BillingPage() {
   const { user } = useAuth();
+  const dbBills = useQuery(api.bills.list) || [];
+  const dbConsumers = useQuery(api.consumers.list) || [];
+  
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [viewing, setViewing] = useState<Bill | null>(null);
+  const [viewing, setViewing] = useState<any | null>(null);
   const [confirmGen, setConfirmGen] = useState(false);
 
-  const enriched = useMemo(() => BILLS.map((b) => {
-    const c = CONSUMERS.find((c) => c.consumerId === b.consumerId)!;
-    return { ...b, consumer: c };
-  }), []);
+  const enriched = useMemo(() => {
+    return dbBills.map((b: any) => {
+      const c = dbConsumers.find((c: any) => c._id === b.consumerId) || {
+        accountNumber: "N/A",
+        fullName: "Unknown",
+        wardId: 0,
+        address: "N/A",
+        meterNumber: "N/A"
+      };
+      return { ...b, consumer: c };
+    });
+  }, [dbBills, dbConsumers]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();

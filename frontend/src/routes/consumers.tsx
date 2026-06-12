@@ -6,7 +6,7 @@ import { ProtectedRoute } from "@/components/app-layout";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { StatusBadge } from "@/components/status-badge";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { api } from "@convex/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,14 +51,22 @@ function ConsumersPage() {
 
   const save = async (data: any) => {
     try {
+      const { connectionDate, ...payload } = data;
       if (editing) {
-        await updateConsumer({ id: editing._id, ...data });
+        // Strip out fields not supported by update mutation
+        const updatePayload = {
+          id: editing._id,
+          status: payload.status,
+          phoneNumber: payload.phoneNumber,
+          email: payload.email,
+        };
+        await updateConsumer(updatePayload);
         toast.success("Consumer updated successfully");
       } else {
-        if (consumers.some((c: any) => c.accountNumber === data.accountNumber)) {
+        if (consumers.some((c: any) => c.accountNumber === payload.accountNumber)) {
           toast.error("Account number must be unique"); return;
         }
-        await createConsumer(data);
+        await createConsumer(payload);
         toast.success("Consumer added successfully");
       }
       setSheetOpen(false);
@@ -70,7 +78,7 @@ function ConsumersPage() {
   const deactivate = async () => {
     if (confirmId == null) return;
     try {
-      await updateConsumer({ id: confirmId, status: "Inactive" });
+      await updateConsumer({ id: confirmId as any, status: "Inactive" });
       toast.success("Consumer deactivated");
       setConfirmId(null);
     } catch (error) {
@@ -107,8 +115,8 @@ function ConsumersPage() {
                 No consumers found. <button className="text-primary underline ml-1" onClick={openAdd}>Add the first one</button>.
               </td></tr>
             )}
-            {pageRows.map((c) => (
-              <tr key={c.consumerId} className="border-t border-border hover:bg-muted/40">
+            {pageRows.map((c: any) => (
+              <tr key={c._id} className="border-t border-border hover:bg-muted/40">
                 <td className="px-4 py-3 font-mono">{c.accountNumber}</td>
                 <td className="px-4 py-3">{c.fullName}</td>
                 <td className="px-4 py-3">Ward {c.wardId}</td>
@@ -117,7 +125,7 @@ function ConsumersPage() {
                 <td className="px-4 py-3 text-right">
                   <button onClick={() => setViewing(c)} className="inline-flex items-center gap-1 text-primary hover:underline mr-3" title="View"><Eye className="w-4 h-4" /></button>
                   <button onClick={() => openEdit(c)} className="inline-flex items-center gap-1 text-primary hover:underline mr-3" title="Edit"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => setConfirmId(c.consumerId)} className="inline-flex items-center gap-1 text-destructive hover:underline" title="Deactivate"><Ban className="w-4 h-4" /></button>
+                  <button onClick={() => setConfirmId(c._id)} className="inline-flex items-center gap-1 text-destructive hover:underline" title="Deactivate"><Ban className="w-4 h-4" /></button>
                 </td>
               </tr>
             ))}

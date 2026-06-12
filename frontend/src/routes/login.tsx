@@ -22,17 +22,27 @@ function LoginPage() {
 
   useEffect(() => { if (user) navigate({ to: "/dashboard" }); }, [user, navigate]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    setTimeout(() => {
-      const res = login(username, password);
+    try {
+      const res = await login(username, password);
       setBusy(false);
-      if (res.ok) { navigate({ to: "/dashboard" }); return; }
-      if (res.locked) { setLocked(true); setError("Account locked. Contact your System Administrator."); }
-      else setError("Invalid username or password");
-    }, 250);
+      if (res.ok) {
+        navigate({ to: "/dashboard" });
+        return;
+      }
+      if (res.locked) {
+        setLocked(true);
+        setError("Account locked. Contact your System Administrator.");
+      } else {
+        setError("Invalid username or password");
+      }
+    } catch (err) {
+      setBusy(false);
+      setError("An unexpected error occurred during login.");
+    }
   };
 
   return (
@@ -67,15 +77,6 @@ function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-border text-xs text-muted-foreground">
-          <p className="font-medium mb-1">Demo accounts (password: <code>password</code>):</p>
-          <ul className="space-y-0.5">
-            <li><code>billing</code> — Billing Officer</li>
-            <li><code>clerk</code> — Finance Clerk</li>
-            <li><code>manager</code> — Finance Manager</li>
-            <li><code>admin</code> — System Administrator</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

@@ -6,16 +6,23 @@ import path from "path";
 
 export default defineConfig({
   plugins: [
+    tanstackRouter({
+      routesDirectory: "./src/routes",
+      generatedRouteTree: "./src/routeTree.gen.ts",
+    }),
     react(),
     tailwindcss(),
-    tanstackRouter(),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@convex": path.resolve(__dirname, "./convex/_generated"),
     },
   },
   server: {
     port: 3000,
+  },
+  define: {
+    "process.env": {},
   },
 });

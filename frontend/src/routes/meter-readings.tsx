@@ -4,7 +4,7 @@ import { Search, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/app-layout";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { api } from "@convex/api";
 import { calculateBill, fmtUSD } from "@/utils/billingCalculator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -82,22 +82,7 @@ function RevenuePage() {
         <Stat label="Collection Rate" value={`${totals.rate.toFixed(1)}%`} accent="primary" />
       </div>
 
-      <div className="bg-surface border border-border rounded-lg p-5">
-        <h3 className="font-semibold mb-4">Collection by Ward</h3>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={byWard}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="name" fontSize={12} />
-              <YAxis fontSize={12} />
-              <Tooltip formatter={(v: number) => fmtUSD(v)} />
-              <Legend />
-              <Bar dataKey="billed" fill="var(--color-primary)" name="Billed" />
-              <Bar dataKey="collected" fill="var(--color-secondary)" name="Collected" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+
 
       <div className="bg-surface border border-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">

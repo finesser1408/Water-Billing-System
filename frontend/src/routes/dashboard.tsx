@@ -6,7 +6,7 @@ import {
 import { ProtectedRoute } from "@/components/app-layout";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { api } from "@convex/api";
 import { fmtUSD } from "@/utils/billingCalculator";
 
 export const Route = createFileRoute("/dashboard")({
@@ -44,7 +44,7 @@ function Dashboard() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold text-foreground">
-          Welcome, {user!.fullName} <span className="text-muted-foreground font-normal">— {user!.role}</span>
+          Welcome, {user?.fullName || "Guest"} <span className="text-muted-foreground font-normal">— {user?.role || "Viewer"}</span>
         </h2>
         <p className="text-sm text-muted-foreground mt-1">Overview of the current billing cycle.</p>
       </div>
@@ -56,32 +56,7 @@ function Dashboard() {
         <KPI icon={AlertCircle} label="Outstanding Balance" value={fmtUSD(outstanding)} color="bg-destructive/10 text-destructive" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-surface border border-border rounded-lg p-5">
-          <h3 className="font-semibold mb-4">Monthly Revenue Collection — Last 6 Months</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[
-                { month: "Dec", revenue: 8420 },
-                { month: "Jan", revenue: 9180 },
-                { month: "Feb", revenue: 8760 },
-                { month: "Mar", revenue: 10240 },
-                { month: "Apr", revenue: 11150 },
-                { month: "May", revenue: collected },
-              ]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
-                <Tooltip
-                  formatter={(v: number) => fmtUSD(v)}
-                  contentStyle={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8 }}
-                />
-                <Bar dataKey="revenue" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-6">
         <div className="bg-surface border border-border rounded-lg p-5">
           <h3 className="font-semibold mb-4">Recent Activity</h3>
           <ul className="space-y-3">

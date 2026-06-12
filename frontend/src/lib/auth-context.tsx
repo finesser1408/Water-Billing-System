@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { api } from "@convex/api";
 
 export type Role =
   | "Billing Officer"
@@ -37,28 +37,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  const login = (username: string, password: string) => {
+  const login = async (username: string, password: string) => {
     const attempts = Number(localStorage.getItem(ATTEMPTS_KEY) || "0");
     if (attempts >= 3) return { ok: false, locked: true };
     
-    const foundUser = users.find(
-      (u: any) => u.username.toLowerCase().trim() === username.toLowerCase().trim()
-    );
-    
-    if (!foundUser || foundUser.password !== password) {
-      localStorage.setItem(ATTEMPTS_KEY, String(attempts + 1));
-      return { ok: false, locked: attempts + 1 >= 3 };
+    try {
+      // Direct call or scanning users array if we use client-side lookup from listing
+      const foundUser = users.find(
+        (u: any) => u.username.toLowerCase().trim() === username.toLowerCase().trim()
+      );
+      
+      if (!foundUser || foundUser.password !== password) {
+        localStorage.setItem(ATTEMPTS_KEY, String(attempts + 1));
+        return { ok: false, locked: attempts + 1 >= 3 };
+      }
+      
+      localStorage.removeItem(ATTEMPTS_KEY);
+      const userData = {
+        username: foundUser.username,
+        fullName: foundUser.fullName,
+        role: foundUser.role as Role,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+      setUser(userData);
+      return { ok: true };
+    } catch (e) {
+      console.error(e);
+      return { ok: false };
     }
-    
-    localStorage.removeItem(ATTEMPTS_KEY);
-    const userData = {
-      username: foundUser.username,
-      fullName: foundUser.fullName,
-      role: foundUser.role,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-    setUser(userData);
-    return { ok: true };
   };
 
   const logout = () => {

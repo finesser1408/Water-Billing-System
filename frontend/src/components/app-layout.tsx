@@ -33,7 +33,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
   if (!user) return null;
-  const menu = ROLE_MENU[user.role];
+  const menu = ROLE_MENU[user.role] || [];
   const initials = user.fullName.split(" ").map((p) => p[0]).slice(0, 2).join("");
   const currentLabel = NAV[pathname]?.label ?? "Dashboard";
 
