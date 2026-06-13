@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { Search, Printer } from "lucide-react";
 import { ProtectedRoute } from "@/components/app-layout";
-import { CONSUMERS, BILLS, PAYMENTS, type Consumer } from "@/lib/mock-data";
+import { useQuery, api } from "@/lib/api-client";
 import { fmtUSD, fmtDate } from "@/utils/billingCalculator";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,32 +13,40 @@ export const Route = createFileRoute("/enquiry")({
 });
 
 function EnquiryPage() {
+  const allConsumers: any[] = useQuery(api.consumers.list) || [];
+  const allBills: any[] = useQuery(api.bills.list) || [];
+  const allPayments: any[] = useQuery(api.payments.list) || [];
+
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [selected, setSelected] = useState<Consumer | null>(null);
+  const [selected, setSelected] = useState<any | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(query), 300); return () => clearTimeout(t); }, [query]);
 
   const results = useMemo(() => {
     const q = debounced.toLowerCase().trim();
     if (!q || selected) return [];
-    return CONSUMERS.filter((c) => c.accountNumber.toLowerCase().includes(q) || c.fullName.toLowerCase().includes(q)).slice(0, 8);
-  }, [debounced, selected]);
+    return allConsumers.filter((c: any) =>
+      c.accountNumber.toLowerCase().includes(q) || c.fullName.toLowerCase().includes(q)
+    ).slice(0, 8);
+  }, [debounced, selected, allConsumers]);
 
   const data = useMemo(() => {
     if (!selected) return null;
-    const bills = BILLS.filter((b) => b.consumerId === selected.consumerId);
-    const payments = PAYMENTS.filter((p) => p.consumerId === selected.consumerId);
-    const outstanding = bills.reduce((s, b) => s + (b.amountDue - b.amountPaid), 0);
-    const overdue = bills.some((b) => b.status === "Overdue");
+    const bills = allBills.filter((b: any) => b.consumerId === selected._id);
+    const payments = allPayments.filter((p: any) => p.consumerId === selected._id);
+    const outstanding = bills.reduce((s: number, b: any) => s + (b.amountDue || 0), 0);
+    const totalPaid = payments.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+    const balance = outstanding - totalPaid;
+    const overdue = bills.some((b: any) => b.status === "Overdue");
     const txns = [
-      ...bills.map((b) => ({ date: b.dueDate, type: "Bill", desc: `Bill ${b.billingPeriod}`, amount: b.amountDue, sign: +1 })),
-      ...payments.map((p) => ({ date: p.paymentDate, type: "Payment", desc: `${p.paymentMethod} · ${p.referenceNumber}`, amount: p.amountPaid, sign: -1 })),
-    ].sort((a, b) => a.date.localeCompare(b.date));
+      ...bills.map((b: any) => ({ date: b.dueDate, type: "Bill", desc: `Bill ${b.billingPeriod}`, amount: b.amountDue, sign: +1 })),
+      ...payments.map((p: any) => ({ date: p.paymentDate, type: "Payment", desc: `${p.paymentMethod}${p.referenceNumber ? " · " + p.referenceNumber : ""}`, amount: p.amount, sign: -1 })),
+    ].sort((a: any, b: any) => a.date.localeCompare(b.date));
     let running = 0;
-    const withBalance = txns.map((t) => { running += t.sign * t.amount; return { ...t, balance: running }; });
-    return { bills, payments, outstanding, overdue, txns: withBalance };
-  }, [selected]);
+    const withBalance = txns.map((t: any) => { running += t.sign * t.amount; return { ...t, balance: running }; });
+    return { bills, payments, outstanding: balance, overdue, txns: withBalance };
+  }, [selected, allBills, allPayments]);
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -48,8 +56,8 @@ function EnquiryPage() {
           value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null); }} />
         {results.length > 0 && (
           <div className="absolute z-10 mt-1 w-full bg-surface border border-border rounded-md shadow-lg">
-            {results.map((c) => (
-              <button key={c.consumerId} onClick={() => { setSelected(c); setQuery(`${c.accountNumber} — ${c.fullName}`); }}
+            {results.map((c: any) => (
+              <button key={c._id} onClick={() => { setSelected(c); setQuery(`${c.accountNumber} — ${c.fullName}`); }}
                 className="w-full text-left px-3 py-2 hover:bg-muted text-sm">
                 <span className="font-mono text-muted-foreground">{c.accountNumber}</span> · {c.fullName}
               </button>
@@ -70,7 +78,7 @@ function EnquiryPage() {
             <div className="text-right md:border-l md:border-border md:pl-4">
               <p className="text-xs uppercase text-muted-foreground">Outstanding Balance</p>
               <p className={`text-3xl font-bold ${data.overdue && data.outstanding > 0 ? "text-destructive" : "text-foreground"}`}>
-                {fmtUSD(data.outstanding)}
+                {fmtUSD(Math.max(0, data.outstanding))}
               </p>
               {data.overdue && data.outstanding > 0 && <p className="text-xs text-destructive font-medium mt-1">Overdue</p>}
               <Button size="sm" variant="outline" className="mt-3 no-print" onClick={() => window.print()}>
@@ -93,7 +101,7 @@ function EnquiryPage() {
               </thead>
               <tbody>
                 {data.txns.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No transactions.</td></tr>}
-                {data.txns.map((t, i) => (
+                {data.txns.map((t: any, i: number) => (
                   <tr key={i} className="border-t border-border">
                     <td className="px-4 py-2">{fmtDate(t.date)}</td>
                     <td className="px-4 py-2">{t.type}</td>
@@ -107,6 +115,13 @@ function EnquiryPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {!selected && !query && (
+        <div className="text-center py-16 text-muted-foreground bg-surface border border-dashed border-border rounded-lg">
+          <Search className="w-12 h-12 mx-auto mb-2 opacity-40" />
+          <p>Search for a consumer to view their account statement.</p>
         </div>
       )}
     </div>

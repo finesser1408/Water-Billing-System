@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { ProtectedRoute } from "@/components/app-layout";
-import { BILLS, CONSUMERS } from "@/lib/mock-data";
+import { useQuery, api } from "@/lib/api-client";
 import { fmtUSD } from "@/utils/billingCalculator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,15 +20,43 @@ export const Route = createFileRoute("/reports/revenue")({
 });
 
 function RevenuePage() {
-  const [cycle, setCycle] = useState("2026-05");
+  const [cycle, setCycle] = useState("2026-06");
   const [status, setStatus] = useState("All");
 
-  const enriched = useMemo(() => BILLS.map((b) => ({ ...b, consumer: CONSUMERS.find((c) => c.consumerId === b.consumerId)! })), []);
-  const filtered = useMemo(() => enriched.filter((b) => (status === "All" || b.status === status)), [enriched, status]);
+  const allBills = useQuery(api.bills.list) || [];
+  const allConsumers = useQuery(api.consumers.list) || [];
+  const allPayments = useQuery(api.payments.list) || [];
+
+  const enriched = useMemo(() => {
+    return allBills.map((b: any) => {
+      const billPayments = allPayments.filter((p: any) => p.billId === b._id);
+      const amountPaid = billPayments.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+      const consumer = allConsumers.find((c: any) => c._id === b.consumerId) || {
+        accountNumber: "N/A",
+        fullName: "Unknown",
+        wardId: 0,
+        address: "N/A",
+        meterNumber: "N/A"
+      };
+      return {
+        ...b,
+        consumer,
+        amountPaid,
+      };
+    });
+  }, [allBills, allPayments, allConsumers]);
+
+  const filtered = useMemo(() => {
+    return enriched.filter((b: any) => {
+      const matchCycle = b.billingPeriod === cycle;
+      const matchStatus = status === "All" || b.status === status;
+      return matchCycle && matchStatus;
+    });
+  }, [enriched, cycle, status]);
 
   const totals = useMemo(() => {
-    const billed = filtered.reduce((s, b) => s + b.amountDue, 0);
-    const collected = filtered.reduce((s, b) => s + b.amountPaid, 0);
+    const billed = filtered.reduce((s: number, b: any) => s + b.amountDue, 0);
+    const collected = filtered.reduce((s: number, b: any) => s + b.amountPaid, 0);
     return { billed, collected, outstanding: billed - collected, rate: billed ? (collected / billed) * 100 : 0 };
   }, [filtered]);
 
@@ -40,12 +68,12 @@ function RevenuePage() {
       row.bills += 1; row.billed += b.amountDue; row.collected += b.amountPaid;
       map.set(w, row);
     }
-    return Array.from(map.values()).sort((a, b) => a.ward - b.ward).map((r) => ({ ...r, name: `Ward ${r.ward}`, outstanding: r.billed - r.collected }));
+    return Array.from(map.values()).sort((a: any, b: any) => a.ward - b.ward).map((r: any) => ({ ...r, name: `Ward ${r.ward}`, outstanding: r.billed - r.collected }));
   }, [filtered]);
 
   const exportCSV = () => {
     const header = "Ward,Bills Issued,Total Billed (USD),Total Collected (USD),Outstanding (USD)\n";
-    const rows = byWard.map((r) => `${r.ward},${r.bills},${r.billed.toFixed(2)},${r.collected.toFixed(2)},${r.outstanding.toFixed(2)}`).join("\n");
+    const rows = byWard.map((r: any) => `${r.ward},${r.bills},${r.billed.toFixed(2)},${r.collected.toFixed(2)},${r.outstanding.toFixed(2)}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `revenue-${cycle}.csv`; a.click();
@@ -96,7 +124,7 @@ function RevenuePage() {
             </tr>
           </thead>
           <tbody>
-            {byWard.map((r) => (
+            {byWard.map((r: any) => (
               <tr key={r.ward} className="border-t border-border">
                 <td className="px-4 py-2">Ward {r.ward}</td>
                 <td className="px-4 py-2 text-right">{r.bills}</td>

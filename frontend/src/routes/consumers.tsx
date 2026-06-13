@@ -5,8 +5,7 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/app-layout";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { StatusBadge } from "@/components/status-badge";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@convex/api";
+import { useQuery, useMutation, api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +56,10 @@ function ConsumersPage() {
         const updatePayload = {
           id: editing._id,
           status: payload.status,
+          fullName: payload.fullName,
+          address: payload.address,
+          wardId: payload.wardId,
+          meterNumber: payload.meterNumber,
           phoneNumber: payload.phoneNumber,
           email: payload.email,
         };
@@ -159,6 +162,8 @@ function ConsumersPage() {
               <DetailRow label="Physical Address" value={viewing.address} />
               <DetailRow label="Ward" value={`Ward ${viewing.wardId}`} />
               <DetailRow label="Meter Number" value={viewing.meterNumber} />
+              <DetailRow label="Phone Number" value={viewing.phoneNumber || "—"} />
+              <DetailRow label="Email Address" value={viewing.email || "—"} />
               <DetailRow label="Connection Date" value={fmtDate(viewing.connectionDate)} />
               <DetailRow label="Status" value={<StatusBadge status={viewing.status} />} />
             </div>
@@ -194,13 +199,34 @@ function ConsumerSheet({ open, onOpenChange, editing, onSave, nextAccount }: {
   const [form, setForm] = useState({
     accountNumber: "", fullName: "", address: "",
     wardId: 1, meterNumber: "", connectionDate: "", status: "Active" as string,
+    phoneNumber: "", email: "",
   });
 
   useEffect(() => {
     if (open) {
       setForm(editing
-        ? { accountNumber: editing.accountNumber, fullName: editing.fullName, address: editing.address, wardId: editing.wardId, meterNumber: editing.meterNumber, connectionDate: editing.connectionDate, status: editing.status }
-        : { accountNumber: nextAccount, fullName: "", address: "", wardId: 1, meterNumber: "", connectionDate: new Date().toISOString().slice(0, 10), status: "Active" });
+        ? {
+            accountNumber: editing.accountNumber,
+            fullName: editing.fullName,
+            address: editing.address,
+            wardId: editing.wardId,
+            meterNumber: editing.meterNumber,
+            connectionDate: editing.connectionDate,
+            status: editing.status,
+            phoneNumber: editing.phoneNumber || "",
+            email: editing.email || "",
+          }
+        : {
+            accountNumber: nextAccount,
+            fullName: "",
+            address: "",
+            wardId: 1,
+            meterNumber: "",
+            connectionDate: new Date().toISOString().slice(0, 10),
+            status: "Active",
+            phoneNumber: "",
+            email: "",
+          });
     }
   }, [open, editing, nextAccount]);
 
@@ -244,6 +270,14 @@ function ConsumerSheet({ open, onOpenChange, editing, onSave, nextAccount }: {
           <div>
             <Label>Meter Number *</Label>
             <Input value={form.meterNumber} onChange={(e) => setForm({ ...form, meterNumber: e.target.value })} required />
+          </div>
+          <div>
+            <Label>Phone Number</Label>
+            <Input value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} placeholder="e.g. +263 77..." />
+          </div>
+          <div>
+            <Label>Email Address</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="e.g. client@example.com" />
           </div>
           <div>
             <Label>Connection Date *</Label>

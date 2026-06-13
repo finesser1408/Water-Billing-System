@@ -3,8 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/app-layout";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@convex/api";
+import { useQuery, useMutation, api } from "@/lib/api-client";
 import { fmtUSD, fmtDate } from "@/utils/billingCalculator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +23,7 @@ function PaymentsPage() {
   const bills = useQuery(api.bills.list) || [];
   const payments = useQuery(api.payments.list) || [];
   const createPayment = useMutation(api.payments.create);
+  const updateBillStatus = useMutation(api.bills.updateStatus);
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [selected, setSelected] = useState<any>(null);
@@ -43,11 +43,14 @@ function PaymentsPage() {
 
   const outstanding = useMemo(() => {
     if (!selected) return 0;
-    const consumerBills = bills.filter((b: any) => b.consumer && b.consumer._id === selected._id);
-    return consumerBills.reduce((s: number, b: any) => s + (b.amountDue || 0), 0);
-  }, [selected, bills]);
+    const consumerBills = bills.filter((b: any) => b.consumerId === selected._id);
+    const consumerPayments = payments.filter((p: any) => p.consumerId === selected._id);
+    const totalBilled = consumerBills.reduce((s: number, b: any) => s + (b.amountDue || 0), 0);
+    const totalPaid = consumerPayments.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+    return Math.max(0, totalBilled - totalPaid);
+  }, [selected, bills, payments]);
 
-  const history = useMemo(() => selected ? payments.filter((p: any) => p.consumer && p.consumer._id === selected._id) : [], [selected, payments]);
+  const history = useMemo(() => selected ? payments.filter((p: any) => p.consumerId === selected._id) : [], [selected, payments]);
 
   useEffect(() => {
     if (amount && Number(amount) > outstanding) setWarning(`Amount exceeds outstanding balance of ${fmtUSD(outstanding)}`);
@@ -58,18 +61,80 @@ function PaymentsPage() {
     e.preventDefault();
     if (!selected || !amount) { toast.error("Please complete all fields"); return; }
     if ((method === "EcoCash" || method === "OneMoney") && !ref) { toast.error("Reference number required for mobile money"); return; }
+
+    const allConsumerBills = bills
+      .filter((b: any) => b.consumerId === selected._id)
+      .sort((a: any, b: any) => a.billingPeriod.localeCompare(b.billingPeriod)); // oldest first
+
+    if (allConsumerBills.length === 0) {
+      toast.error("Cannot record payment: This consumer does not have any billing records yet. Please generate a bill first.");
+      return;
+    }
+
     if (warning) toast.warning(warning);
+
     try {
-      await createPayment({
-        paymentId: `PAY-${Date.now()}`,
-        billId: selected._id,
-        consumerId: selected._id,
-        amount: Number(amount),
-        paymentDate: date,
-        paymentMethod: method,
-        referenceNumber: ref || undefined,
-        receivedBy: "current_user",
-      });
+      let amountToPay = Number(amount);
+
+      const getAmountPaidForBill = (billId: string) => {
+        return payments
+          .filter((p: any) => p.billId === billId)
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      };
+
+      const unpaidBills = allConsumerBills
+        .map((b: any) => {
+          const paid = getAmountPaidForBill(b._id);
+          const remaining = Math.max(0, b.amountDue - paid);
+          return { ...b, paid, remaining };
+        })
+        .filter((b: any) => b.remaining > 0);
+
+      if (unpaidBills.length > 0) {
+        for (const bill of unpaidBills) {
+          if (amountToPay <= 0) break;
+          const payForThisBill = Math.round(Math.min(amountToPay, bill.remaining) * 100) / 100;
+
+          await createPayment({
+            paymentId: `PAY-${Date.now()}-${bill._id.slice(0, 4)}`,
+            billId: bill._id,
+            consumerId: selected._id,
+            amount: payForThisBill,
+            paymentDate: date,
+            paymentMethod: method,
+            referenceNumber: ref || undefined,
+            receivedBy: "current_user",
+          });
+
+          const isFullyPaid = payForThisBill >= bill.remaining;
+          await updateBillStatus({
+            id: bill._id,
+            status: isFullyPaid ? "Paid" : "Partially Paid"
+          });
+
+          amountToPay = Math.round((amountToPay - payForThisBill) * 100) / 100;
+        }
+      }
+
+      // If there's still leftover amount (overpayment), record it against the newest bill
+      if (amountToPay > 0) {
+        const newestBill = allConsumerBills[allConsumerBills.length - 1];
+        await createPayment({
+          paymentId: `PAY-${Date.now()}-over`,
+          billId: newestBill._id,
+          consumerId: selected._id,
+          amount: amountToPay,
+          paymentDate: date,
+          paymentMethod: method,
+          referenceNumber: ref || undefined,
+          receivedBy: "current_user",
+        });
+        await updateBillStatus({
+          id: newestBill._id,
+          status: "Paid"
+        });
+      }
+
       toast.success(`Payment recorded — new balance ${fmtUSD(Math.max(0, outstanding - Number(amount)))}`);
       setAmount(""); setRef("");
     } catch (error) {

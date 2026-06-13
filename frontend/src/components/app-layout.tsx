@@ -5,7 +5,6 @@ import {
   BarChart3, PieChart, UserCog, Settings, ScrollText, HelpCircle,
   LogOut, Bell, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { useAuth, ROLE_MENU, type Role } from "@/lib/auth-context";
 import { fmtDate } from "@/utils/billingCalculator";
 import { cn } from "@/lib/utils";

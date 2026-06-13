@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
 } from "recharts";
 import { ProtectedRoute } from "@/components/app-layout";
-import { PAYMENTS, CONSUMERS } from "@/lib/mock-data";
+import { useQuery, api } from "@/lib/api-client";
 import { fmtUSD, fmtDate } from "@/utils/billingCalculator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,19 +21,21 @@ const COLORS = ["var(--color-primary)", "var(--color-secondary)", "var(--color-a
 function CollectionPage() {
   const [from, setFrom] = useState("2026-06-01");
   const [to, setTo] = useState("2026-06-30");
+  const allPayments = useQuery(api.payments.list) || [];
+  const allConsumers = useQuery(api.consumers.list) || [];
 
-  const filtered = useMemo(() => PAYMENTS.filter((p) => p.paymentDate >= from && p.paymentDate <= to), [from, to]);
+  const filtered = useMemo(() => allPayments.filter((p: any) => p.paymentDate >= from && p.paymentDate <= to), [allPayments, from, to]);
   const byMethod = useMemo(() => {
     const m = new Map<string, number>();
-    for (const p of filtered) m.set(p.paymentMethod, (m.get(p.paymentMethod) ?? 0) + p.amountPaid);
+    for (const p of filtered) m.set(p.paymentMethod, (m.get(p.paymentMethod) ?? 0) + (p.amount || 0));
     return Array.from(m.entries()).map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }));
   }, [filtered]);
 
   const exportCSV = () => {
     const header = "Date,Account No,Consumer,Amount,Method,Reference,Received By\n";
-    const rows = filtered.map((p) => {
-      const c = CONSUMERS.find((c) => c.consumerId === p.consumerId)!;
-      return `${p.paymentDate},${c.accountNumber},"${c.fullName}",${p.amountPaid.toFixed(2)},${p.paymentMethod},${p.referenceNumber},"${p.receivedBy}"`;
+    const rows = filtered.map((p: any) => {
+      const c = allConsumers.find((c: any) => c._id === p.consumerId) || { accountNumber: "N/A", fullName: "Unknown" };
+      return `${p.paymentDate},${c.accountNumber},"${c.fullName}",${(p.amount || 0).toFixed(2)},${p.paymentMethod},${p.referenceNumber || ""},"${p.receivedBy}"`;
     }).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -82,16 +84,16 @@ function CollectionPage() {
           </thead>
           <tbody>
             {filtered.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No payments in this range.</td></tr>}
-            {filtered.map((p) => {
-              const c = CONSUMERS.find((c) => c.consumerId === p.consumerId)!;
+            {filtered.map((p: any) => {
+              const c = allConsumers.find((c: any) => c._id === p.consumerId) || { accountNumber: "N/A", fullName: "Unknown" };
               return (
-                <tr key={p.paymentId} className="border-t border-border">
+                <tr key={p._id} className="border-t border-border">
                   <td className="px-4 py-2">{fmtDate(p.paymentDate)}</td>
                   <td className="px-4 py-2 font-mono">{c.accountNumber}</td>
                   <td className="px-4 py-2">{c.fullName}</td>
-                  <td className="px-4 py-2 text-right font-medium">{fmtUSD(p.amountPaid)}</td>
+                  <td className="px-4 py-2 text-right font-medium">{fmtUSD(p.amount || 0)}</td>
                   <td className="px-4 py-2">{p.paymentMethod}</td>
-                  <td className="px-4 py-2 font-mono text-xs">{p.referenceNumber}</td>
+                  <td className="px-4 py-2 font-mono text-xs">{p.referenceNumber || "-"}</td>
                   <td className="px-4 py-2">{p.receivedBy}</td>
                 </tr>
               );

@@ -1,6 +1,11 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@convex/api";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { useQuery, useMutation, api } from "@/lib/api-client";
 
 export type Role =
   | "Billing Officer"
@@ -17,7 +22,10 @@ export interface User {
 
 interface AuthContextValue {
   user: User | null;
-  login: (username: string, password: string) => { ok: boolean; locked?: boolean };
+  login: (
+    username: string,
+    password: string
+  ) => Promise<{ ok: boolean; locked?: boolean; inactive?: boolean }>;
   logout: () => void;
 }
 
@@ -28,8 +36,10 @@ const ATTEMPTS_KEY = "elb_auth_attempts";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const users = useQuery(api.users.list) || [];
+  const users: any[] = useQuery(api.users.list) || [];
+  const updateLastLogin = useMutation(api.users.updateLastLogin);
 
+  // Restore session from localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -40,26 +50,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     const attempts = Number(localStorage.getItem(ATTEMPTS_KEY) || "0");
     if (attempts >= 3) return { ok: false, locked: true };
-    
+
     try {
-      // Direct call or scanning users array if we use client-side lookup from listing
       const foundUser = users.find(
-        (u: any) => u.username.toLowerCase().trim() === username.toLowerCase().trim()
+        (u: any) =>
+          u.username.toLowerCase().trim() === username.toLowerCase().trim()
       );
-      
+
       if (!foundUser || foundUser.password !== password) {
-        localStorage.setItem(ATTEMPTS_KEY, String(attempts + 1));
-        return { ok: false, locked: attempts + 1 >= 3 };
+        const newAttempts = attempts + 1;
+        localStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
+        return { ok: false, locked: newAttempts >= 3 };
       }
-      
+
+      // Block inactive accounts
+      if (foundUser.status === "Inactive") {
+        return { ok: false, inactive: true };
+      }
+
       localStorage.removeItem(ATTEMPTS_KEY);
-      const userData = {
+
+      const userData: User = {
+        _id: foundUser._id,
         username: foundUser.username,
         fullName: foundUser.fullName,
         role: foundUser.role as Role,
       };
+
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       setUser(userData);
+
+      // Record the login timestamp in Convex
+      updateLastLogin({ id: foundUser._id }).catch(console.error);
+
       return { ok: true };
     } catch (e) {
       console.error(e);
@@ -72,7 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
@@ -84,8 +111,21 @@ export function useAuth() {
 export const ROLE_MENU: Record<Role, string[]> = {
   "Billing Officer": ["/dashboard", "/consumers", "/meter-readings", "/help"],
   "Finance Clerk": ["/dashboard", "/consumers", "/payments", "/enquiry", "/help"],
-  "Finance Manager": ["/dashboard", "/consumers", "/billing", "/reports/revenue", "/reports/collection", "/help"],
-  "System Administrator": ["/dashboard", "/admin/users", "/admin/tariff", "/admin/logs", "/help"],
+  "Finance Manager": [
+    "/dashboard",
+    "/consumers",
+    "/billing",
+    "/reports/revenue",
+    "/reports/collection",
+    "/help",
+  ],
+  "System Administrator": [
+    "/dashboard",
+    "/admin/users",
+    "/admin/tariff",
+    "/admin/logs",
+    "/help",
+  ],
 };
 
 export function canAccess(role: Role | undefined, path: string) {

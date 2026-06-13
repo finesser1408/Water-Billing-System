@@ -36,6 +36,8 @@ function LoginPage() {
       if (res.locked) {
         setLocked(true);
         setError("Account locked. Contact your System Administrator.");
+      } else if (res.inactive) {
+        setError("This account has been deactivated. Contact your System Administrator.");
       } else {
         setError("Invalid username or password");
       }

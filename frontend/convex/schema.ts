@@ -8,6 +8,8 @@ export default defineSchema({
     role: v.string(), // "Billing Officer", "Finance Clerk", "Finance Manager", "System Administrator"
     fullName: v.string(),
     email: v.optional(v.string()),
+    status: v.optional(v.string()), // "Active", "Inactive"
+    lastLogin: v.optional(v.string()),
   }).index("by_username", ["username"]),
 
   consumers: defineTable({

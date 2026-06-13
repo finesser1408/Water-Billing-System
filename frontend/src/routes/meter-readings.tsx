@@ -3,8 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Search, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/app-layout";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@convex/api";
+import { useQuery, useMutation, api } from "@/lib/api-client";
 import { calculateBill, fmtUSD } from "@/utils/billingCalculator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +15,7 @@ export const Route = createFileRoute("/meter-readings")({
 
 function MeterReadings() {
   const consumers = useQuery(api.consumers.list) || [];
+  const readings = useQuery(api.meterReadings.list) || [];
   const createReading = useMutation(api.meterReadings.create);
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -37,7 +37,23 @@ function MeterReadings() {
     ).slice(0, 8);
   }, [debounced, selected, consumers]);
 
-  const prevReading = selected ? (selected.prevReading || 0) : 0;
+  const consumerReadings = useMemo(() => {
+    if (!selected) return [];
+    return readings.filter((r: any) => r.consumerId === selected._id);
+  }, [readings, selected]);
+
+  const prevReading = useMemo(() => {
+    if (consumerReadings.length === 0) return 0;
+    const sorted = [...consumerReadings].sort((a: any, b: any) => b.currentReading - a.currentReading);
+    return sorted[0].currentReading;
+  }, [consumerReadings]);
+
+  const avgConsumption = useMemo(() => {
+    if (consumerReadings.length === 0) return 0;
+    const sum = consumerReadings.reduce((s: number, r: any) => s + (r.consumption || 0), 0);
+    return Math.round((sum / consumerReadings.length) * 10) / 10;
+  }, [consumerReadings]);
+
   const consumption = selected && currReading ? Number(currReading) - prevReading : 0;
   const preview = consumption > 0 ? calculateBill(consumption) : null;
 
@@ -75,7 +91,7 @@ function MeterReadings() {
           value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null); }} />
         {results.length > 0 && (
           <div className="absolute z-10 mt-1 w-full bg-surface border border-border rounded-md shadow-lg overflow-hidden">
-            {results.map((c) => (
+            {results.map((c: any) => (
               <button key={c.consumerId}
                 onClick={() => { setSelected(c); setQuery(`${c.accountNumber} — ${c.fullName}`); }}
                 className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex justify-between">
@@ -94,7 +110,7 @@ function MeterReadings() {
             <Info label="Account No." value={selected.accountNumber} mono />
             <Info label="Ward" value={`Ward ${selected.wardId}`} />
             <Info label="Previous Reading" value={`${prevReading} kL`} />
-            <Info label="Historical Avg." value={`${selected.avgConsumption || "N/A"} kL/month`} />
+            <Info label="Historical Avg." value={avgConsumption > 0 ? `${avgConsumption} kL/month` : "N/A"} />
             <Info label="Meter No." value={selected.meterNumber} mono />
           </div>
 

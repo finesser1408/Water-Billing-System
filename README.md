@@ -1,6 +1,6 @@
 # Epworth Local Board — Smart Water Billing System (Aqua Flow)
 
-A responsive, database-driven React Single Page Application (SPA) built for Epworth Local Board to manage consumer accounts, record water meter readings, track payments, generate bills, and oversee system configurations using **Convex** as the backend database layer.
+A responsive, database-driven React Single Page Application (SPA) built for Epworth Local Board to manage consumer accounts, record water meter readings, track payments, generate bills, and oversee system configurations using **Express and SQLite** as the backend database layer.
 
 ---
 
@@ -13,24 +13,46 @@ The project is divided into two parts: the **Frontend** client and the **Backend
 * Uses **TanStack Router** for routing and access permissions, **TanStack Query** for client caching, and **Lucide Icons** for icons.
 * Entry point is [main.tsx](file:///c:/Users/Tavonga/Documents/Projects/Water%20Billing%20System/frontend/src/main.tsx) pointing to `index.html`.
 
-**Running locally:**
+### 2. The Backend (`/backend`)
+* Contains the Express API server that serves data and handles business logic.
+* Uses **SQLite** via the `sqlite` and `sqlite3` packages for database persistence.
+* Declares tables, indices, and database initialization code in [db.ts](file:///c:/Users/Tavonga/Documents/Projects/Water%20Billing%20System/backend/src/db.ts).
+* Automatically creates and initializes the local database file `backend/aquaflow.db` on first start.
+
+---
+
+## 🚀 Running Locally
+
+You can launch both the frontend and backend concurrently or run them separately.
+
+### Option A: Running Concurrently (Recommended)
+You can start both servers from the `/frontend` directory:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Open **`http://localhost:3000`** in your browser.
+This starts:
+* Express backend server at **`http://localhost:5000`**
+* Vite frontend client at **`http://localhost:3000`**
 
-### 2. The Backend (`/frontend/convex`)
-* Uses **Convex** to run reactive serverless database mutations and queries.
-* Declares schema structures, indexes, and backend validation code in [schema.ts](file:///c:/Users/Tavonga/Documents/Projects/Water%20Billing%20System/frontend/convex/schema.ts).
-* Automatically updates frontend query subscribers when database records change.
+### Option B: Running Separately
 
-**Running Convex Dev Engine (watches schemas/functions and syncs them):**
+**1. Start the Backend Server:**
+```bash
+cd backend
+npm install
+npm run dev
+```
+The backend server runs at **`http://localhost:5000`**.
+
+**2. Start the Frontend client:**
 ```bash
 cd frontend
-npx convex dev
+npm install
+npm run dev:vite
 ```
+The frontend client runs at **`http://localhost:3000`**.
 
 ---
 
@@ -47,54 +69,17 @@ The system implements Role-Based Access Control (RBAC). When logging in, the app
 
 ---
 
-## ➕ Creating a New User in the Convex Dashboard
+## 🔑 Seeding & User Management
 
-Since authentication checks against the live database, you can create new operators directly from Convex:
+### 1. Default Administrator Account
+On initial startup, the database is automatically seeded with a default System Administrator account. You can log in using these credentials to begin setting up the system:
+* **Username:** `Ubetthina`
+* **Password:** `Ubetthina123`
 
-1. Locate the terminal running `npx convex dev`.
-2. Look for the **Convex Dashboard Link** printed in that terminal (e.g., `https://dashboard.convex.dev/...`). Click to open it in your browser.
-3. In the left-hand navigation sidebar, click on **Data** (database browser).
-4. Select the **`users`** table from the list.
-5. Click the **"Add Document"** button at the top right.
-6. Populate the JSON editor with the following properties (ensure spelling is exact):
-   ```json
-   {
-     "username": "johndoe",
-     "password": "password123",
-     "fullName": "John Doe",
-     "role": "Billing Officer"
-   }
-   ```
-   *Note: Set `"role"` to one of the exact strings:* `"Billing Officer"`, `"Finance Clerk"`, `"Finance Manager"`, *or* `"System Administrator"`.
-7. Click **"Save Document"**. The new operator will be able to log in immediately on the frontend app using their username and password.
-
----
-
-## ⚡ Initializing a New Convex Account & Setup
-
-If you are setting up this project on a fresh machine or deploying it to a new Convex database environment, follow these steps to initialize and link a new Convex account:
-
-### 1. Create a Convex Account
-1. Go to [convex.dev](https://www.convex.dev/) and click **Sign Up** (you can authenticate using GitHub).
-2. Follow the prompt to set up your personal workspace or organization.
-
-### 2. Log In to Convex CLI
-In your project terminal, authenticate your local command-line interface with your new account:
-```bash
-cd frontend
-npx convex login
-```
-*This will open a browser window requesting authorization. Approve it to connect your terminal.*
-
-### 3. Initialize and Link the Project
-Initialize the project to configure a new Convex deployment:
-```bash
-npx convex dev
-```
-* The CLI will ask: `"What would you like to configure?"` Select **Create a new project**.
-* Choose your workspace and project name when prompted.
-* This automatically creates your local `.env.local` configuration containing your unique `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL` variables, and deploys the schemas/functions to your new database.
-
-### 4. Seed the Database
-Once the database environment has synced, you should create a default Administrator account inside the `users` table via the Convex web dashboard (following the *Creating a New User* steps above) so that you can log in and start using the system.
+### 2. Creating New Users
+Once logged in as the System Administrator:
+1. Navigate to the **User Management** menu in the sidebar (`/admin/users`).
+2. Click **Add User** at the top right.
+3. Fill in the operator's details (Username, Full Name, Role, Password).
+4. Save the user. They will be able to log in immediately with the role permissions assigned.
 

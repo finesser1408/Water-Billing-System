@@ -6,8 +6,7 @@ import { ProtectedRoute } from "@/components/app-layout";
 import { StatusBadge } from "@/components/status-badge";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery } from "convex/react";
-import { api } from "@convex/api";
+import { useQuery, useMutation, api } from "@/lib/api-client";
 import { calculateBill, fmtUSD, fmtDate } from "@/utils/billingCalculator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,11 +23,70 @@ function BillingPage() {
   const { user } = useAuth();
   const dbBills = useQuery(api.bills.list) || [];
   const dbConsumers = useQuery(api.consumers.list) || [];
-  
+  const dbReadings = useQuery(api.meterReadings.list) || [];
+  const createBill = useMutation(api.bills.create);
+
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [viewing, setViewing] = useState<any | null>(null);
   const [confirmGen, setConfirmGen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateBills = async () => {
+    setGenerating(true);
+    let createdCount = 0;
+    try {
+      const activeConsumers = dbConsumers.filter((c: any) => c.status === "Active");
+      const currentPeriod = "2026-06";
+      const dueDate = "2026-06-30";
+
+      for (const consumer of activeConsumers) {
+        // Check if bill already exists
+        const billExists = dbBills.some(
+          (b: any) => b.consumerId === consumer._id && b.billingPeriod === currentPeriod
+        );
+        if (billExists) continue;
+
+        // Find the latest reading for this consumer
+        const consumerReadings = dbReadings
+          .filter((r: any) => r.consumerId === consumer._id)
+          .sort((a: any, b: any) => b.readingDate.localeCompare(a.readingDate));
+
+        if (consumerReadings.length === 0) continue;
+
+        const latestReading = consumerReadings[0];
+        const breakdown = calculateBill(latestReading.consumption);
+
+        await createBill({
+          billId: `BILL-202606-${consumer.accountNumber.replace("-", "")}-${Date.now().toString().slice(-4)}`,
+          consumerId: consumer._id,
+          billingPeriod: currentPeriod,
+          prevReading: latestReading.previousReading,
+          currReading: latestReading.currentReading,
+          consumption: latestReading.consumption,
+          amountDue: breakdown.total,
+          dueDate,
+          status: "Unpaid",
+          generatedDate: new Date().toISOString().slice(0, 10),
+          generatedBy: user?.fullName || "Finance Manager",
+        });
+
+        createdCount++;
+      }
+
+      if (createdCount > 0) {
+        toast.success(`Successfully generated ${createdCount} bills for the June 2026 cycle.`);
+      } else {
+        toast("No new bills to generate. All active consumers with readings have been billed.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate some bills.");
+    } finally {
+      setGenerating(false);
+      setConfirmGen(false);
+    }
+  };
 
   const enriched = useMemo(() => {
     return dbBills.map((b: any) => {
@@ -46,7 +104,7 @@ function BillingPage() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return enriched;
-    return enriched.filter((b) => b.consumer.accountNumber.toLowerCase().includes(q) || b.consumer.fullName.toLowerCase().includes(q));
+    return enriched.filter((b: any) => b.consumer.accountNumber.toLowerCase().includes(q) || b.consumer.fullName.toLowerCase().includes(q));
   }, [enriched, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -80,7 +138,7 @@ function BillingPage() {
           </thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No bills found.</td></tr>}
-            {rows.map((b) => (
+            {rows.map((b: any) => (
               <tr key={b.billId} className="border-t border-border hover:bg-muted/40">
                 <td className="px-4 py-3 font-mono">{b.consumer.accountNumber}</td>
                 <td className="px-4 py-3">{b.consumer.fullName}</td>
@@ -112,8 +170,8 @@ function BillingPage() {
       <ConfirmModal open={confirmGen} onOpenChange={setConfirmGen}
         title="Generate bills for current cycle?"
         message="This will generate bills for all active consumers with submitted meter readings. This action cannot be undone."
-        confirmLabel="Generate"
-        onConfirm={() => { toast.success("Bills generated successfully for June 2026 cycle"); setConfirmGen(false); }} />
+        confirmLabel={generating ? "Generating..." : "Generate"}
+        onConfirm={handleGenerateBills} />
     </div>
   );
 }

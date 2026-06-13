@@ -5,8 +5,7 @@ import {
 } from "recharts";
 import { ProtectedRoute } from "@/components/app-layout";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery } from "convex/react";
-import { api } from "@convex/api";
+import { useQuery, api } from "@/lib/api-client";
 import { fmtUSD } from "@/utils/billingCalculator";
 
 export const Route = createFileRoute("/dashboard")({
@@ -61,7 +60,7 @@ function Dashboard() {
           <h3 className="font-semibold mb-4">Recent Activity</h3>
           <ul className="space-y-3">
             <li className="border-l-2 border-primary/40 pl-3">
-              <p className="text-sm text-foreground">System initialized with Convex backend</p>
+              <p className="text-sm text-foreground">System initialized with Node.js + SQLite backend</p>
               <p className="text-xs text-muted-foreground mt-0.5">Just now · System</p>
             </li>
           </ul>
