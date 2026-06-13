@@ -67,3 +67,34 @@ Since authentication checks against the live database, you can create new operat
    ```
    *Note: Set `"role"` to one of the exact strings:* `"Billing Officer"`, `"Finance Clerk"`, `"Finance Manager"`, *or* `"System Administrator"`.
 7. Click **"Save Document"**. The new operator will be able to log in immediately on the frontend app using their username and password.
+
+---
+
+## ⚡ Initializing a New Convex Account & Setup
+
+If you are setting up this project on a fresh machine or deploying it to a new Convex database environment, follow these steps to initialize and link a new Convex account:
+
+### 1. Create a Convex Account
+1. Go to [convex.dev](https://www.convex.dev/) and click **Sign Up** (you can authenticate using GitHub).
+2. Follow the prompt to set up your personal workspace or organization.
+
+### 2. Log In to Convex CLI
+In your project terminal, authenticate your local command-line interface with your new account:
+```bash
+cd frontend
+npx convex login
+```
+*This will open a browser window requesting authorization. Approve it to connect your terminal.*
+
+### 3. Initialize and Link the Project
+Initialize the project to configure a new Convex deployment:
+```bash
+npx convex dev
+```
+* The CLI will ask: `"What would you like to configure?"` Select **Create a new project**.
+* Choose your workspace and project name when prompted.
+* This automatically creates your local `.env.local` configuration containing your unique `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL` variables, and deploys the schemas/functions to your new database.
+
+### 4. Seed the Database
+Once the database environment has synced, you should create a default Administrator account inside the `users` table via the Convex web dashboard (following the *Creating a New User* steps above) so that you can log in and start using the system.
+
