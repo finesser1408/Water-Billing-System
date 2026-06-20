@@ -80,11 +80,11 @@ export function useMutation(apiPath: string) {
       return res.json();
     },
     onSuccess: () => {
-      // Refresh all lists to emulate Convex's live reactive updates
+      // Refresh all lists to keep local cache updated
       queryClient.invalidateQueries();
     }
   });
 
-  // Return the async executor, mimicking Convex's useMutation
+  // Return the async executor
   return (args?: any) => mutation.mutateAsync(args);
 }

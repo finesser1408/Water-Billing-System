@@ -40,7 +40,7 @@ const ROLES = [
 ] as const;
 
 function UsersAdmin() {
-  // ── Convex ──────────────────────────────────────────────────────────────
+  // ── Queries & Mutations ──────────────────────────────────────────────────
   const users = useQuery(api.users.list) ?? [];
   const createUser = useMutation(api.users.create);
   const deactivateUser = useMutation(api.users.deactivate);

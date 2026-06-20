@@ -49,7 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const attempts = Number(localStorage.getItem(ATTEMPTS_KEY) || "0");
-    if (attempts >= 3) return { ok: false, locked: true };
 
     try {
       const foundUser = users.find(
@@ -57,18 +56,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           u.username.toLowerCase().trim() === username.toLowerCase().trim()
       );
 
-      if (!foundUser || foundUser.password !== password) {
+      // Validate credentials first
+      if (foundUser && foundUser.password === password) {
+        if (foundUser.status === "Inactive") {
+          return { ok: false, inactive: true };
+        }
+        // Clear lockout counter upon correct login
+        localStorage.removeItem(ATTEMPTS_KEY);
+      } else {
+        // If they are already locked, block them immediately
+        if (attempts >= 3) {
+          return { ok: false, locked: true };
+        }
         const newAttempts = attempts + 1;
         localStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
         return { ok: false, locked: newAttempts >= 3 };
       }
-
-      // Block inactive accounts
-      if (foundUser.status === "Inactive") {
-        return { ok: false, inactive: true };
-      }
-
-      localStorage.removeItem(ATTEMPTS_KEY);
 
       const userData: User = {
         _id: foundUser._id,
@@ -80,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
       setUser(userData);
 
-      // Record the login timestamp in Convex
+      // Record the login timestamp
       updateLastLogin({ id: foundUser._id }).catch(console.error);
 
       return { ok: true };
